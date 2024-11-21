@@ -1,0 +1,11 @@
+streamlit>=1.26.0
+openai>=0.27.0  
+pandas>=1.5.0 
+matplotlib
+networkx
+pillow==11.0.0
+tqdm>=4.60.0 
+matplotlib>=3.5.0
+pip>=24.3.1              # Ensures the latest pip for Python 3.11
+setuptools>=65.0         # Required for modern package installations
+wheel>=0.41.0 
