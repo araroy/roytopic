@@ -4,8 +4,11 @@ import pandas as pd
 from io import BytesIO
 import matplotlib.pyplot as plt
 import networkx as nx
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import AgglomerativeClustering
+from transformers import GPT2TokenizerFast
 
-# Set OpenAI API Key from Streamlit Secrets and preprocess
+# Set OpenAI API Key
 def set_openai_api_key():
     raw_api_key = st.secrets.get("OPENAI_API_KEY")
     if not raw_api_key:
@@ -14,26 +17,17 @@ def set_openai_api_key():
     clean_api_key = raw_api_key.strip()  # Remove any leading/trailing whitespaces
     openai.api_key = clean_api_key
 
-# Function to preprocess text
+# Preprocess text
 def preprocess_text(text_column):
-    # Remove leading and trailing whitespaces
     return text_column.str.strip()
-
-from transformers import GPT2TokenizerFast
 
 # Initialize GPT-2 tokenizer to estimate tokens
 tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
 def estimate_tokens(text):
-    """
-    Estimate the number of tokens in a given text using GPT-2 tokenizer.
-    """
     return len(tokenizer.encode(text))
 
 def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, reserved_tokens=500):
-    """
-    Dynamically process input_texts in chunks to respect token limits for GPT models.
-    """
     topics = []
     chunk = []
     token_count = 0
@@ -41,7 +35,6 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
     for text in input_texts:
         text_tokens = estimate_tokens(text)
         if token_count + text_tokens + reserved_tokens > max_tokens:
-            # Ensure prompt is defined only when the chunk is not empty
             if chunk:
                 prompt = f"""
                 You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
@@ -59,15 +52,12 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
                 except Exception as e:
                     topics.append(f"Error: {e}")
 
-            # Reset for the next chunk
             chunk = [text]
             token_count = text_tokens
         else:
-            # Add text to the current chunk
             chunk.append(text)
             token_count += text_tokens
 
-    # Process remaining texts in the last chunk
     if chunk:
         prompt = f"""
         You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
@@ -87,29 +77,47 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
 
     return "\n\n".join(topics)
 
+# Consolidate similar topics
+def consolidate_topics(topic_texts, n_clusters):
+    vectorizer = TfidfVectorizer(stop_words='english')
+    topic_vectors = vectorizer.fit_transform(topic_texts)
 
-# Function to visualize topics as circles
+    clustering_model = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
+    labels = clustering_model.fit_predict(topic_vectors.toarray())
+
+    consolidated_topics = {}
+    for label, topic in zip(labels, topic_texts):
+        consolidated_topics.setdefault(label, []).append(topic)
+
+    consolidated_results = []
+    for label, topics in consolidated_topics.items():
+        consolidated_results.append(f"Cluster {label + 1}: " + " | ".join(topics))
+
+    return consolidated_results
+
+# Visualize topics as circles
 def visualize_topics(topic_text):
     topics = topic_text.split("\n")
     G = nx.Graph()
 
-    # Parse topics and keywords
     for topic in topics:
         if not topic.strip():
             continue
-        topic_name, keywords = topic.split(":", 1)
-        keywords = keywords.strip(" -[]").split(",")
-        topic_node = topic_name.strip()
-        G.add_node(topic_node, size=20)
-        for keyword in keywords:
-            if ":" in keyword:
-                key, loading = keyword.split(":")
-                key = key.strip()
-                loading = float(loading.strip())
-                G.add_node(key, size=10 + loading * 50)  # Size scales with factor loading
-                G.add_edge(topic_node, key)
+        try:
+            topic_name, keywords = topic.split(":", 1)
+            keywords = keywords.strip(" -[]").split(",")
+            topic_node = topic_name.strip()
+            G.add_node(topic_node, size=20)
+            for keyword in keywords:
+                if ":" in keyword:
+                    key, loading = keyword.split(":")
+                    key = key.strip()
+                    loading = float(loading.strip())
+                    G.add_node(key, size=10 + loading * 50)
+                    G.add_edge(topic_node, key)
+        except ValueError:
+            continue
 
-    # Draw the graph
     pos = nx.spring_layout(G, seed=42)
     plt.figure(figsize=(10, 7))
     nx.draw(
@@ -131,8 +139,9 @@ st.markdown("""
 Upload a CSV or Excel file, and use GPT-4 for topic modeling:
 1. Text preprocessing: Remove whitespaces.
 2. Securely access OpenAI API key.
-3. Extract main topics with factor loadings.
-4. Visualize topics as circles.
+3. Extract main topics with factor loadings in manageable chunks.
+4. Consolidate similar topics.
+5. Visualize topics as circles.
 """)
 
 # File Upload
@@ -152,42 +161,42 @@ if uploaded_file:
         # Select column for topic modeling
         text_column = st.selectbox("Select the column for topic modeling", options=df.columns)
 
-        # Remove whitespaces
+        # Preprocess Text
         if st.button("Preprocess Text"):
             df[text_column] = preprocess_text(df[text_column])
             st.success("Text preprocessed successfully!")
-            st.write("Updated Data:")
             st.write(df[[text_column]].head())
 
         # Topic Modeling
+        num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+        n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
         if st.button("Run Topic Modeling"):
-            set_openai_api_key()  # Set OpenAI API key
+            set_openai_api_key()
             input_texts = df[text_column].dropna().tolist()
+            raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
 
-    # Ensure chunk_size is defined before calling the function
-            num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+            raw_topic_list = raw_topics.split("\n")
+            consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
 
-            chunk_size = st.slider("Chunk Size (Number of Rows per Request)", min_value=100, max_value=2000, value=1000)
-        
-            set_openai_api_key()  # Set OpenAI API key
-            input_texts = df[text_column].dropna().tolist()
-            topic_text = get_topics_with_loadings_chunked(input_texts, num_topics, chunk_size)
             st.markdown("### Extracted Topics with Loadings")
-            st.text(topic_text)
+            st.text("\n".join(raw_topic_list))
+
+            st.markdown("### Consolidated Topics")
+            st.text("\n".join(consolidated_topics))
 
             # Visualize Topics
             st.markdown("### Topic Visualization")
-            visualize_topics(topic_text)
+            visualize_topics("\n".join(raw_topic_list))
 
-            # Option to download the topics
-            topics_df = pd.DataFrame({"Extracted Topics": topic_text.split("\n")})
+            # Download Consolidated Topics
+            topics_df = pd.DataFrame({"Consolidated Topics": consolidated_topics})
             output = BytesIO()
             topics_df.to_csv(output, index=False)
             output.seek(0)
             st.download_button(
-                label="Download Topics",
+                label="Download Consolidated Topics",
                 data=output,
-                file_name="extracted_topics.csv",
+                file_name="consolidated_topics.csv",
                 mime="text/csv"
             )
     except Exception as e:
