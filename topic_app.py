@@ -7,6 +7,8 @@ import networkx as nx
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import AgglomerativeClustering
 from transformers import GPT2TokenizerFast
+from difflib import SequenceMatcher
+
 
 # Set OpenAI API Key
 def set_openai_api_key():
