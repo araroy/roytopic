@@ -41,23 +41,52 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
     for text in input_texts:
         text_tokens = estimate_tokens(text)
         if token_count + text_tokens + reserved_tokens > max_tokens:
-            # Process the current chunk
-            prompt = f"""
-            You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
-            Provide the topics in this format:
-            Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-            Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-            Texts: {' '.join(chunk)}
-            """
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        topics = response.choices[0].message.content
-        return topics
-    except Exception as e:
-        return f"Error: {e}"
+            # Ensure prompt is defined only when the chunk is not empty
+            if chunk:
+                prompt = f"""
+                You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
+                Provide the topics in this format:
+                Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+                Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+                Texts: {' '.join(chunk)}
+                """
+                try:
+                    response = openai.chat.completions.create(
+                        model="gpt-4",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    topics.append(response.choices[0].message.content)
+                except Exception as e:
+                    topics.append(f"Error: {e}")
+
+            # Reset for the next chunk
+            chunk = [text]
+            token_count = text_tokens
+        else:
+            # Add text to the current chunk
+            chunk.append(text)
+            token_count += text_tokens
+
+    # Process remaining texts in the last chunk
+    if chunk:
+        prompt = f"""
+        You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
+        Provide the topics in this format:
+        Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+        Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+        Texts: {' '.join(chunk)}
+        """
+        try:
+            response = openai.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            topics.append(response.choices[0].message.content)
+        except Exception as e:
+            topics.append(f"Error: {e}")
+
+    return "\n\n".join(topics)
+
 
 # Function to visualize topics as circles
 def visualize_topics(topic_text):
