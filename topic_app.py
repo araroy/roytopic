@@ -16,7 +16,32 @@ def set_openai_api_key():
         st.stop()
     clean_api_key = raw_api_key.strip()  # Remove any leading/trailing whitespaces
     openai.api_key = clean_api_key
+# Deduplicate topics
+def deduplicate_topics(topic_list, similarity_threshold=0.8):
+    """
+    Deduplicate topics based on text similarity.
 
+    Args:
+        topic_list (list): List of topics as strings.
+        similarity_threshold (float): Minimum similarity ratio to consider topics as duplicates.
+
+    Returns:
+        list: Deduplicated list of topics.
+    """
+    unique_topics = []
+    for topic in topic_list:
+        if not topic.strip():
+            continue
+        is_duplicate = False
+        for unique_topic in unique_topics:
+            # Compute similarity between the current topic and existing unique topics
+            similarity = SequenceMatcher(None, topic, unique_topic).ratio()
+            if similarity > similarity_threshold:
+                is_duplicate = True
+                break
+        if not is_duplicate:
+            unique_topics.append(topic)
+    return unique_topics
 # Preprocess text
 def preprocess_text(text_column):
     return text_column.str.strip()
