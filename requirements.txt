@@ -12,3 +12,6 @@ wheel>=0.41.0
 openpyxl>=3.0.9
 transformers
 scikit-learn
+torch
+tensorflow
+
