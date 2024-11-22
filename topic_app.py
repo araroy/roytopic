@@ -19,18 +19,36 @@ def preprocess_text(text_column):
     # Remove leading and trailing whitespaces
     return text_column.str.strip()
 
-# Function to perform topic modeling using GPT-4 with chunk processing
-def get_topics_with_loadings_chunked(input_texts, num_topics, chunk_size=2000):
+from transformers import GPT2TokenizerFast
+
+# Initialize GPT-2 tokenizer to estimate tokens
+tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
+
+def estimate_tokens(text):
+    """
+    Estimate the number of tokens in a given text using GPT-2 tokenizer.
+    """
+    return len(tokenizer.encode(text))
+
+def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, reserved_tokens=500):
+    """
+    Dynamically process input_texts in chunks to respect token limits for GPT models.
+    """
     topics = []
-    for i in range(0, len(input_texts), chunk_size):
-        chunk = input_texts[i:i + chunk_size]
-        prompt = f"""
-        You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
-        Provide the topics in this format:
-        Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-        Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-        Texts: {' '.join(chunk)}
-        """
+    chunk = []
+    token_count = 0
+
+    for text in input_texts:
+        text_tokens = estimate_tokens(text)
+        if token_count + text_tokens + reserved_tokens > max_tokens:
+            # Process the current chunk
+            prompt = f"""
+            You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
+            Provide the topics in this format:
+            Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+            Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+            Texts: {' '.join(chunk)}
+            """
     try:
         response = openai.chat.completions.create(
             model="gpt-4",
