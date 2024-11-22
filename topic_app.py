@@ -31,11 +31,12 @@ def get_topics_in_chunks(input_texts, num_topics, chunk_size=2000):
         Texts: {' '.join(chunk)}
         """
         try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            topics.append(response.choices[0].message.content.strip())
+           response = openai.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        topics = response.choices[0].message.content
+        return topics
         except Exception as e:
             topics.append(f"Error: {e}")
     return "\n\n".join(topics)
