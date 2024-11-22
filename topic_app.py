@@ -115,9 +115,9 @@ if uploaded_file:
         # Topic Modeling
         num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
         if st.button("Run Topic Modeling"):
-            set_openai_api_key()  # Set OpenAI API key and remove whitespaces
-            input_texts = " ".join(df[text_column].dropna().tolist())
-            topic_text = get_topics_with_loadings(input_texts, num_topics)
+            set_openai_api_key()  # Set OpenAI API key
+            input_texts = df[text_column].dropna().tolist()
+            topic_text = get_topics_with_loadings_chunked(input_texts, num_topics, chunk_size)
             st.markdown("### Extracted Topics with Loadings")
             st.text(topic_text)
 
