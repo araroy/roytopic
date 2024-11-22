@@ -118,6 +118,8 @@ if uploaded_file:
             input_texts = df[text_column].dropna().tolist()
 
     # Ensure chunk_size is defined before calling the function
+            num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+
             chunk_size = st.slider("Chunk Size (Number of Rows per Request)", min_value=100, max_value=2000, value=1000)
         
             set_openai_api_key()  # Set OpenAI API key
