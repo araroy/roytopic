@@ -60,8 +60,8 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
 
     if chunk:
         prompt = f"""
-        You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
-        Provide the topics in this format:
+        You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} unique main topics. 
+        Ensure that the topics do not overlap significantly. Provide the topics in this format:
         Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
         Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
         Texts: {' '.join(chunk)}
@@ -74,8 +74,9 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
             topics.append(response.choices[0].message.content)
         except Exception as e:
             topics.append(f"Error: {e}")
-
-    return "\n\n".join(topics)
+    topics_combined = "\n".join(topics)
+    unique_topics = deduplicate_topics(topics_combined.split("\n"))
+    return "\n".join(unique_topics)
 
 # Consolidate similar topics
 def consolidate_topics(topic_texts, n_clusters):
