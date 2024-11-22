@@ -113,8 +113,13 @@ if uploaded_file:
             st.write(df[[text_column]].head())
 
         # Topic Modeling
-        num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
         if st.button("Run Topic Modeling"):
+            set_openai_api_key()  # Set OpenAI API key
+            input_texts = df[text_column].dropna().tolist()
+
+    # Ensure chunk_size is defined before calling the function
+            chunk_size = st.slider("Chunk Size (Number of Rows per Request)", min_value=100, max_value=2000, value=1000)
+        
             set_openai_api_key()  # Set OpenAI API key
             input_texts = df[text_column].dropna().tolist()
             topic_text = get_topics_with_loadings_chunked(input_texts, num_topics, chunk_size)
