@@ -35,10 +35,10 @@ def get_topics_in_chunks(input_texts, num_topics, chunk_size=2000):
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}]
         )
-        topics = response.choices[0].message.content
-        return topics
+            topics = response.choices[0].message.content
+            return topics
         except Exception as e:
-            topics.append(f"Error: {e}")
+            topics(f"Error: {e}")
     return "\n\n".join(topics)
 
 # Visualize topics as circles
