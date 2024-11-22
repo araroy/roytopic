@@ -5,40 +5,42 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import networkx as nx
 
-# Set OpenAI API Key from Streamlit Secrets and preprocess
+# Set OpenAI API Key
 def set_openai_api_key():
     raw_api_key = st.secrets.get("OPENAI_API_KEY")
     if not raw_api_key:
         st.error("OpenAI API Key is missing! Add it to the Streamlit secrets.")
         st.stop()
-    clean_api_key = raw_api_key.strip()  # Remove any leading/trailing whitespaces
+    clean_api_key = raw_api_key.strip()
     openai.api_key = clean_api_key
 
-# Function to preprocess text
+# Preprocess text
 def preprocess_text(text_column):
-    # Remove leading and trailing whitespaces
     return text_column.str.strip()
 
-# Function to perform topic modeling using GPT-4
-def get_topics_with_loadings(input_texts, num_topics):
-    prompt = f"""
-    You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
-    Provide the topics in this format:
-    Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-    Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-    Texts: {input_texts}
-    """
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        topics = response.choices[0].message.content
-        return topics
-    except Exception as e:
-        return f"Error: {e}"
+# Chunked topic modeling
+def get_topics_in_chunks(input_texts, num_topics, chunk_size=2000):
+    topics = []
+    for i in range(0, len(input_texts), chunk_size):
+        chunk = input_texts[i:i + chunk_size]
+        prompt = f"""
+        You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
+        Provide the topics in this format:
+        Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+        Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+        Texts: {' '.join(chunk)}
+        """
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            topics.append(response.choices[0].message.content.strip())
+        except Exception as e:
+            topics.append(f"Error: {e}")
+    return "\n\n".join(topics)
 
-# Function to visualize topics as circles
+# Visualize topics as circles
 def visualize_topics(topic_text):
     topics = topic_text.split("\n")
     G = nx.Graph()
@@ -47,17 +49,20 @@ def visualize_topics(topic_text):
     for topic in topics:
         if not topic.strip():
             continue
-        topic_name, keywords = topic.split(":", 1)
-        keywords = keywords.strip(" -[]").split(",")
-        topic_node = topic_name.strip()
-        G.add_node(topic_node, size=20)
-        for keyword in keywords:
-            if ":" in keyword:
-                key, loading = keyword.split(":")
-                key = key.strip()
-                loading = float(loading.strip())
-                G.add_node(key, size=10 + loading * 50)  # Size scales with factor loading
-                G.add_edge(topic_node, key)
+        try:
+            topic_name, keywords = topic.split(":", 1)
+            keywords = keywords.strip(" -[]").split(",")
+            topic_node = topic_name.strip()
+            G.add_node(topic_node, size=20)
+            for keyword in keywords:
+                if ":" in keyword:
+                    key, loading = keyword.split(":")
+                    key = key.strip()
+                    loading = float(loading.strip())
+                    G.add_node(key, size=10 + loading * 50)
+                    G.add_edge(topic_node, key)
+        except ValueError:
+            continue
 
     # Draw the graph
     pos = nx.spring_layout(G, seed=42)
@@ -81,7 +86,7 @@ st.markdown("""
 Upload a CSV or Excel file, and use GPT-4 for topic modeling:
 1. Text preprocessing: Remove whitespaces.
 2. Securely access OpenAI API key.
-3. Extract main topics with factor loadings.
+3. Extract main topics with factor loadings in chunks.
 4. Visualize topics as circles.
 """)
 
@@ -111,10 +116,12 @@ if uploaded_file:
 
         # Topic Modeling
         num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+        chunk_size = st.slider("Chunk Size (Number of Rows per Request)", min_value=100, max_value=2000, value=1000)
+
         if st.button("Run Topic Modeling"):
-            set_openai_api_key()  # Set OpenAI API key and remove whitespaces
-            input_texts = " ".join(df[text_column].dropna().tolist())
-            topic_text = get_topics_with_loadings(input_texts, num_topics)
+            set_openai_api_key()
+            input_texts = df[text_column].dropna().tolist()
+            topic_text = get_topics_in_chunks(input_texts, num_topics, chunk_size=chunk_size)
             st.markdown("### Extracted Topics with Loadings")
             st.text(topic_text)
 
@@ -122,7 +129,7 @@ if uploaded_file:
             st.markdown("### Topic Visualization")
             visualize_topics(topic_text)
 
-            # Option to download the topics
+            # Download topics
             topics_df = pd.DataFrame({"Extracted Topics": topic_text.split("\n")})
             output = BytesIO()
             topics_df.to_csv(output, index=False)
