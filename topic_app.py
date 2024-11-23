@@ -66,8 +66,8 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
                 prompt = f"""
                 You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} main topics. 
                 Provide the topics in this format:
-                Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-                Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+                Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ..., Keyword10: Loading10]
+                Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ..., Keyword10: Loading10]
                 Texts: {' '.join(chunk)}
                 """
                 try:
@@ -89,8 +89,8 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
         prompt = f"""
         You are an AI assistant skilled in topic modeling. Analyze the following texts and extract {num_topics} unique main topics. 
         Ensure that the topics do not overlap significantly. Provide the topics in this format:
-        Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
-        Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ...]
+        Topic 1: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ..., Keyword10: Loading10]
+        Topic 2: Main Topic Text - [Keyword1: Loading1, Keyword2: Loading2, ..., Keyword10: Loading10]
         Texts: {' '.join(chunk)}
         """
         try:
@@ -122,6 +122,29 @@ def consolidate_topics(topic_texts, n_clusters):
         consolidated_results.append(f"Cluster {label + 1}: " + " | ".join(topics))
 
     return consolidated_results
+# Add topic columns
+            for i, topic in enumerate(raw_topic_list, start=1):
+                if ":" in topic:
+                    topic_name, keywords = topic.split(":", 1)
+                    keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+                    df[f"Topic {i}"] = df[text_column].apply(
+                        lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+                    )
+
+            st.markdown("### Updated Dataset with Topic Columns")
+            st.write(df.head())
+
+            # Allow users to download the updated dataset
+            output = BytesIO()
+            df.to_csv(output, index=False)
+            output.seek(0)
+            st.download_button(
+                label="Download Updated Dataset",
+                data=output,
+                file_name="updated_dataset_with_topics.csv",
+                mime="text/csv"
+            )
+
 
 # Visualize topics as circles
 def visualize_topics(topic_text):
@@ -160,7 +183,29 @@ def visualize_topics(topic_text):
     plt.title("Topic Modeling Visualization", fontsize=14)
     st.pyplot(plt.gcf())
     plt.clf()
+# Propose the number of topics using factor loadings
+def propose_number_of_topics(texts, max_topics=20):
+    vectorizer = TfidfVectorizer(stop_words="english")
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    svd = TruncatedSVD(n_components=min(max_topics, tfidf_matrix.shape[1] - 1))
+    svd.fit(tfidf_matrix)
 
+    explained_variance = svd.explained_variance_ratio_
+    cumulative_variance = explained_variance.cumsum()
+
+    # Plot Scree Plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, len(explained_variance) + 1), cumulative_variance, marker="o", label="Cumulative Variance")
+    plt.axhline(y=0.8, color="r", linestyle="--", label="80% Variance Threshold")
+    plt.title("Scree Plot for Number of Topics")
+    plt.xlabel("Number of Topics")
+    plt.ylabel("Cumulative Explained Variance")
+    plt.legend()
+    st.pyplot(plt.gcf())
+
+    # Suggest number of topics
+    suggested_topics = next((i + 1 for i, var in enumerate(cumulative_variance) if var >= 0.8), max_topics)
+    return suggested_topics
 # Streamlit App
 st.title("GPT-4 Topic Modeling App with Visualization")
 st.markdown("""
