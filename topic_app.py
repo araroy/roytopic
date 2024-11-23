@@ -258,28 +258,28 @@ if uploaded_file:
                   st.markdown("### Consolidated Topics")
                   st.text("\n".join(consolidated_topics))
 
-                  # Add topic columns to the dataset
-                 for i, topic in enumerate(raw_topic_list, start=1):
-                     if ":" in topic:
-                          topic_name, keywords = topic.split(":", 1)
-                          keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
-                          df[f"Topic {i}"] = df[text_column].apply(
-                              lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
-                          )
+                 # Add topic columns to the dataset
+for i, topic in enumerate(raw_topic_list, start=1):
+    if ":" in topic:
+        topic_name, keywords = topic.split(":", 1)
+        keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+        df[f"Topic {i}"] = df[text_column].apply(
+            lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+        )
 
-                  st.markdown("### Updated Dataset with Topic Columns")
-                  st.write(df.head())
+st.markdown("### Updated Dataset with Topic Columns")
+st.write(df.head())
 
-                  # Allow users to download the updated dataset
-                  output = BytesIO()
-                  df.to_csv(output, index=False)
-                  output.seek(0)
-                  st.download_button(
-                      label="Download Updated Dataset",
-                      data=output,
-                      file_name="updated_dataset_with_topics.csv",
-                      mime="text/csv"
-                  )
+# Allow users to download the updated dataset
+output = BytesIO()
+df.to_csv(output, index=False)
+output.seek(0)
+st.download_button(
+    label="Download Updated Dataset",
+    data=output,
+    file_name="updated_dataset_with_topics.csv",
+    mime="text/csv"
+)
 
             # Visualize Topics
             st.markdown("### Topic Visualization")
