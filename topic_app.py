@@ -241,10 +241,10 @@ if uploaded_file:
             df[text_column] = preprocess_text(df[text_column])
             st.success("Text preprocessed successfully!")
             st.write(df[[text_column]].head())
-# 244         # Topic Modeling
-              num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
-              n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
-              if st.button("Run Topic Modeling"):
+         # Topic Modeling
+            num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+            n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
+            if st.button("Run Topic Modeling"):
                   set_openai_api_key()
                   input_texts = df[text_column].dropna().tolist()
                   raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
