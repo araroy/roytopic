@@ -122,6 +122,7 @@ def consolidate_topics(topic_texts, n_clusters):
         consolidated_results.append(f"Cluster {label + 1}: " + " | ".join(topics))
 
     return consolidated_results
+
 # Add topic columns
 for i, topic in enumerate(raw_topic_list, start=1):
     if ":" in topic:
@@ -256,6 +257,11 @@ if uploaded_file:
 
             st.markdown("### Consolidated Topics")
             st.text("\n".join(consolidated_topics))
+             # Add topic columns to the dataset
+            for i, topic in enumerate(raw_topic_list, start=1):
+                if ":" in topic:
+                    topic_name, keywords = topic.split(":", 1)
+                    keywords = [kw.split(":")[0].strip()
 
             # Visualize Topics
             st.markdown("### Topic Visualization")
