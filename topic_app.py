@@ -123,13 +123,13 @@ def consolidate_topics(topic_texts, n_clusters):
 
     return consolidated_results
 # Add topic columns
-            for i, topic in enumerate(raw_topic_list, start=1):
-                if ":" in topic:
-                    topic_name, keywords = topic.split(":", 1)
-                    keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
-                    df[f"Topic {i}"] = df[text_column].apply(
-                        lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
-                    )
+for i, topic in enumerate(raw_topic_list, start=1):
+    if ":" in topic:
+            topic_name, keywords = topic.split(":", 1)
+            keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+            df[f"Topic {i}"] = df[text_column].apply(
+                lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+            )
 
             st.markdown("### Updated Dataset with Topic Columns")
             st.write(df.head())
