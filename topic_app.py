@@ -241,28 +241,45 @@ if uploaded_file:
             df[text_column] = preprocess_text(df[text_column])
             st.success("Text preprocessed successfully!")
             st.write(df[[text_column]].head())
+# 244         # Topic Modeling
+              num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+              n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
+              if st.button("Run Topic Modeling"):
+                  set_openai_api_key()
+                  input_texts = df[text_column].dropna().tolist()
+                  raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
 
-        # Topic Modeling
-        num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
-        n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
-        if st.button("Run Topic Modeling"):
-            set_openai_api_key()
-            input_texts = df[text_column].dropna().tolist()
-            raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
+                  raw_topic_list = raw_topics.split("\n")
+                  consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
 
-            raw_topic_list = raw_topics.split("\n")
-            consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
+                  st.markdown("### Extracted Topics with Loadings")
+                  st.text("\n".join(raw_topic_list))
 
-            st.markdown("### Extracted Topics with Loadings")
-            st.text("\n".join(raw_topic_list))
+                  st.markdown("### Consolidated Topics")
+                  st.text("\n".join(consolidated_topics))
 
-            st.markdown("### Consolidated Topics")
-            st.text("\n".join(consolidated_topics))
-             # Add topic columns to the dataset
-            for i, topic in enumerate(raw_topic_list, start=1):
-                if ":" in topic:
-                    topic_name, keywords = topic.split(":", 1)
-                    keywords = [kw.split(":")[0].strip()
+                  # Add topic columns to the dataset
+                 for i, topic in enumerate(raw_topic_list, start=1):
+                     if ":" in topic:
+                          topic_name, keywords = topic.split(":", 1)
+                          keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+                          df[f"Topic {i}"] = df[text_column].apply(
+                              lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+                          )
+
+                  st.markdown("### Updated Dataset with Topic Columns")
+                  st.write(df.head())
+
+                  # Allow users to download the updated dataset
+                  output = BytesIO()
+                  df.to_csv(output, index=False)
+                  output.seek(0)
+                  st.download_button(
+                      label="Download Updated Dataset",
+                      data=output,
+                      file_name="updated_dataset_with_topics.csv",
+                      mime="text/csv"
+                  )
 
             # Visualize Topics
             st.markdown("### Topic Visualization")
