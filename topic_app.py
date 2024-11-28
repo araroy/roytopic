@@ -207,11 +207,15 @@ if uploaded_file:
                 st.write(df[[text_column]].head())
             except Exception as e:
                 st.error(f"Error during text preprocessing: {e}")
-
         # Topic Modeling
         if st.button("Run Topic Modeling"):
             try:
                 set_openai_api_key()
+                
+                # Add sliders for defining number of topics and clusters
+                num_topics = st.slider("Number of Topics to Extract", min_value=1, max_value=10, value=5)
+                n_clusters = st.slider("Number of Consolidated Topics", min_value=2, max_value=20, value=5)
+
                 input_texts = df[text_column].dropna().tolist()
                 raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
                 raw_topic_list = raw_topics.split("\n")
@@ -260,5 +264,6 @@ if uploaded_file:
 
             except Exception as e:
                 st.error(f"Error during topic modeling: {e}")
+
     except Exception as e:
         st.error(f"Error processing the file: {e}")
