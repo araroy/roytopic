@@ -18,6 +18,8 @@ def set_openai_api_key():
         st.stop()
     clean_api_key = raw_api_key.strip()  # Remove any leading/trailing whitespaces
     openai.api_key = clean_api_key
+
+
 # Deduplicate topics
 def deduplicate_topics(topic_list, similarity_threshold=0.8):
     """
@@ -44,15 +46,20 @@ def deduplicate_topics(topic_list, similarity_threshold=0.8):
         if not is_duplicate:
             unique_topics.append(topic)
     return unique_topics
+
+
 # Preprocess text
 def preprocess_text(text_column):
     return text_column.str.strip()
 
+
 # Initialize GPT-2 tokenizer to estimate tokens
 tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
 
+
 def estimate_tokens(text):
     return len(tokenizer.encode(text))
+
 
 def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, reserved_tokens=500):
     topics = []
@@ -71,7 +78,7 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
                 Texts: {' '.join(chunk)}
                 """
                 try:
-                    response = openai.chat.completions.create(
+                    response = openai.chat_completions.create(
                         model="gpt-4",
                         messages=[{"role": "user", "content": prompt}]
                     )
@@ -94,7 +101,7 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
         Texts: {' '.join(chunk)}
         """
         try:
-            response = openai.chat.completions.create(
+            response = openai.chat_completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -104,6 +111,7 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
     topics_combined = "\n".join(topics)
     unique_topics = deduplicate_topics(topics_combined.split("\n"))
     return "\n".join(unique_topics)
+
 
 # Consolidate similar topics
 def consolidate_topics(topic_texts, n_clusters):
@@ -122,30 +130,6 @@ def consolidate_topics(topic_texts, n_clusters):
         consolidated_results.append(f"Cluster {label + 1}: " + " | ".join(topics))
 
     return consolidated_results
-
-# Add topic columns to the dataset
-for i, topic in enumerate(raw_topic_list, start=1):
-    if ":" in topic:
-        topic_name, keywords = topic.split(":", 1)
-        keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
-        df[f"Topic {i}"] = df[text_column].apply(
-            lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
-        )
-
-# Visualize Topics
-st.markdown("### Updated Dataset with Topic Columns")
-st.write(df.head())
-
-# Allow users to download the updated dataset
-output = BytesIO()
-df.to_csv(output, index=False)
-output.seek(0)
-st.download_button(
-    label="Download Updated Dataset",
-    data=output,
-    file_name="updated_dataset_with_topics.csv",
-    mime="text/csv"
-)
 
 
 # Visualize topics as circles
@@ -185,29 +169,8 @@ def visualize_topics(topic_text):
     plt.title("Topic Modeling Visualization", fontsize=14)
     st.pyplot(plt.gcf())
     plt.clf()
-# Propose the number of topics using factor loadings
-def propose_number_of_topics(texts, max_topics=20):
-    vectorizer = TfidfVectorizer(stop_words="english")
-    tfidf_matrix = vectorizer.fit_transform(texts)
-    svd = TruncatedSVD(n_components=min(max_topics, tfidf_matrix.shape[1] - 1))
-    svd.fit(tfidf_matrix)
 
-    explained_variance = svd.explained_variance_ratio_
-    cumulative_variance = explained_variance.cumsum()
 
-    # Plot Scree Plot
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(explained_variance) + 1), cumulative_variance, marker="o", label="Cumulative Variance")
-    plt.axhline(y=0.8, color="r", linestyle="--", label="80% Variance Threshold")
-    plt.title("Scree Plot for Number of Topics")
-    plt.xlabel("Number of Topics")
-    plt.ylabel("Cumulative Explained Variance")
-    plt.legend()
-    st.pyplot(plt.gcf())
-
-    # Suggest number of topics
-    suggested_topics = next((i + 1 for i, var in enumerate(cumulative_variance) if var >= 0.8), max_topics)
-    return suggested_topics
 # Streamlit App
 st.title("GPT-4 Topic Modeling App with Visualization")
 st.markdown("""
@@ -222,7 +185,6 @@ Upload a CSV or Excel file, and use GPT-4 for topic modeling:
 # File Upload
 uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
-# File upload and data preview
 if uploaded_file:
     try:
         # Load data
@@ -246,73 +208,57 @@ if uploaded_file:
             except Exception as e:
                 st.error(f"Error during text preprocessing: {e}")
 
-if st.button("Run Topic Modeling"):
-    try:
-        # Set API key
-        set_openai_api_key()
+        # Topic Modeling
+        if st.button("Run Topic Modeling"):
+            try:
+                set_openai_api_key()
+                input_texts = df[text_column].dropna().tolist()
+                raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
+                raw_topic_list = raw_topics.split("\n")
+                consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
 
-        # Extract input texts from the selected column
-        input_texts = df[text_column].dropna().tolist()
+                st.markdown("### Extracted Topics with Loadings")
+                st.text("\n".join(raw_topic_list))
 
-        # Generate raw topics
-        raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
+                st.markdown("### Consolidated Topics")
+                st.text("\n".join(consolidated_topics))
 
-        # Split raw topics into a list
-        raw_topic_list = raw_topics.split("\n")
+                for i, topic in enumerate(raw_topic_list, start=1):
+                    if ":" in topic:
+                        topic_name, keywords = topic.split(":", 1)
+                        keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+                        df[f"Topic {i}"] = df[text_column].apply(
+                            lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+                        )
 
-        # Consolidate topics
-        consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
+                st.markdown("### Updated Dataset with Topic Columns")
+                st.write(df.head())
 
-        # Display raw topics
-        st.markdown("### Extracted Topics with Loadings")
-        st.text("\n".join(raw_topic_list))
-
-        # Display consolidated topics
-        st.markdown("### Consolidated Topics")
-        st.text("\n".join(consolidated_topics))
-
-        # Add topic columns to the dataset
-        for i, topic in enumerate(raw_topic_list, start=1):
-            if ":" in topic:
-                topic_name, keywords = topic.split(":", 1)
-                keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
-                df[f"Topic {i}"] = df[text_column].apply(
-                    lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
+                output = BytesIO()
+                df.to_csv(output, index=False)
+                output.seek(0)
+                st.download_button(
+                    label="Download Updated Dataset",
+                    data=output,
+                    file_name="updated_dataset_with_topics.csv",
+                    mime="text/csv"
                 )
 
-        # Display updated dataset
-        st.markdown("### Updated Dataset with Topic Columns")
-        st.write(df.head())
+                st.markdown("### Topic Visualization")
+                visualize_topics("\n".join(raw_topic_list))
 
-        # Allow users to download the updated dataset
-        output = BytesIO()
-        df.to_csv(output, index=False)
-        output.seek(0)
-        st.download_button(
-            label="Download Updated Dataset",
-            data=output,
-            file_name="updated_dataset_with_topics.csv",
-            mime="text/csv"
-        )
+                topics_df = pd.DataFrame({"Consolidated Topics": consolidated_topics})
+                output = BytesIO()
+                topics_df.to_csv(output, index=False)
+                output.seek(0)
+                st.download_button(
+                    label="Download Consolidated Topics",
+                    data=output,
+                    file_name="consolidated_topics.csv",
+                    mime="text/csv"
+                )
 
-        # Visualize Topics
-        st.markdown("### Topic Visualization")
-        visualize_topics("\n".join(raw_topic_list))
-
-        # Download Consolidated Topics
-        topics_df = pd.DataFrame({"Consolidated Topics": consolidated_topics})
-        output = BytesIO()
-        topics_df.to_csv(output, index=False)
-        output.seek(0)
-        st.download_button(
-            label="Download Consolidated Topics",
-            data=output,
-            file_name="consolidated_topics.csv",
-            mime="text/csv"
-        )
-
-    except Exception as e:
-        st.error(f"Error during topic modeling: {e}")
-
+            except Exception as e:
+                st.error(f"Error during topic modeling: {e}")
     except Exception as e:
         st.error(f"Error processing the file: {e}")
