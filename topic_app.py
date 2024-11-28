@@ -78,7 +78,7 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
                 Texts: {' '.join(chunk)}
                 """
                 try:
-                    response = openai.chat_completions.create(
+                    response = openai.chat.completions.create(
                         model="gpt-4",
                         messages=[{"role": "user", "content": prompt}]
                     )
@@ -101,7 +101,7 @@ def get_topics_with_loadings_chunked(input_texts, num_topics, max_tokens=8192, r
         Texts: {' '.join(chunk)}
         """
         try:
-            response = openai.chat_completions.create(
+            response = openai.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}]
             )
