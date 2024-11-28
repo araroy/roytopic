@@ -246,63 +246,73 @@ if uploaded_file:
             except Exception as e:
                 st.error(f"Error during text preprocessing: {e}")
 
-        # Topic Modeling
-        if st.button("Run Topic Modeling"):
-            try:
-                set_openai_api_key()
-                input_texts = df[text_column].dropna().tolist()
-                raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
+if st.button("Run Topic Modeling"):
+    try:
+        # Set API key
+        set_openai_api_key()
 
-                raw_topic_list = raw_topics.split("\n")
-                consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
+        # Extract input texts from the selected column
+        input_texts = df[text_column].dropna().tolist()
 
-                st.markdown("### Extracted Topics with Loadings")
-                st.text("\n".join(raw_topic_list))
+        # Generate raw topics
+        raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
 
-                st.markdown("### Consolidated Topics")
-                st.text("\n".join(consolidated_topics))
+        # Split raw topics into a list
+        raw_topic_list = raw_topics.split("\n")
 
-                # Add topic columns to the dataset
-                for i, topic in enumerate(raw_topic_list, start=1):
-                    if ":" in topic:
-                        topic_name, keywords = topic.split(":", 1)
-                        keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
-                        df[f"Topic {i}"] = df[text_column].apply(
-                            lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
-                        )
+        # Consolidate topics
+        consolidated_topics = consolidate_topics(raw_topic_list, n_clusters)
 
-                st.markdown("### Updated Dataset with Topic Columns")
-                st.write(df.head())
+        # Display raw topics
+        st.markdown("### Extracted Topics with Loadings")
+        st.text("\n".join(raw_topic_list))
 
-                # Allow users to download the updated dataset
-                output = BytesIO()
-                df.to_csv(output, index=False)
-                output.seek(0)
-                st.download_button(
-                    label="Download Updated Dataset",
-                    data=output,
-                    file_name="updated_dataset_with_topics.csv",
-                    mime="text/csv"
+        # Display consolidated topics
+        st.markdown("### Consolidated Topics")
+        st.text("\n".join(consolidated_topics))
+
+        # Add topic columns to the dataset
+        for i, topic in enumerate(raw_topic_list, start=1):
+            if ":" in topic:
+                topic_name, keywords = topic.split(":", 1)
+                keywords = [kw.split(":")[0].strip() for kw in keywords.strip(" -[]").split(",")]
+                df[f"Topic {i}"] = df[text_column].apply(
+                    lambda x: 1 if any(keyword in str(x) for keyword in keywords) else 0
                 )
 
-                # Visualize Topics
-                st.markdown("### Topic Visualization")
-                visualize_topics("\n".join(raw_topic_list))
+        # Display updated dataset
+        st.markdown("### Updated Dataset with Topic Columns")
+        st.write(df.head())
 
-                # Download Consolidated Topics
-                topics_df = pd.DataFrame({"Consolidated Topics": consolidated_topics})
-                output = BytesIO()
-                topics_df.to_csv(output, index=False)
-                output.seek(0)
-                st.download_button(
-                    label="Download Consolidated Topics",
-                    data=output,
-                    file_name="consolidated_topics.csv",
-                    mime="text/csv"
-                )
+        # Allow users to download the updated dataset
+        output = BytesIO()
+        df.to_csv(output, index=False)
+        output.seek(0)
+        st.download_button(
+            label="Download Updated Dataset",
+            data=output,
+            file_name="updated_dataset_with_topics.csv",
+            mime="text/csv"
+        )
 
-            except Exception as e:
-                st.error(f"Error during topic modeling: {e}")
+        # Visualize Topics
+        st.markdown("### Topic Visualization")
+        visualize_topics("\n".join(raw_topic_list))
+
+        # Download Consolidated Topics
+        topics_df = pd.DataFrame({"Consolidated Topics": consolidated_topics})
+        output = BytesIO()
+        topics_df.to_csv(output, index=False)
+        output.seek(0)
+        st.download_button(
+            label="Download Consolidated Topics",
+            data=output,
+            file_name="consolidated_topics.csv",
+            mime="text/csv"
+        )
+
+    except Exception as e:
+        st.error(f"Error during topic modeling: {e}")
 
     except Exception as e:
         st.error(f"Error processing the file: {e}")
