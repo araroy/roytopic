@@ -237,11 +237,12 @@ if uploaded_file:
         text_column = st.selectbox("Select the column for topic modeling", options=df.columns)
 
         # Preprocess Text
-        if st.button("Preprocess Text"):
+if st.button("Preprocess Text"):
             df[text_column] = preprocess_text(df[text_column])
             st.success("Text preprocessed successfully!")
             st.write(df[[text_column]].head())
-            if st.button("Run Topic Modeling"):
+# Run Topic Modeling block
+if st.button("Run Topic Modeling"):
     set_openai_api_key()
     input_texts = df[text_column].dropna().tolist()
     raw_topics = get_topics_with_loadings_chunked(input_texts, num_topics)
@@ -293,6 +294,6 @@ if uploaded_file:
         file_name="consolidated_topics.csv",
         mime="text/csv"
     )
-         
+
     except Exception as e:
         st.error(f"Error processing the file: {e}")
